@@ -1,68 +1,49 @@
-﻿import { WebSocketServer, WebSocket } from 'ws';
+﻿import { WebSocketServer } from 'ws';
 import { SCS76Codec } from '../core/SCS76_Codec';
-import { InputCodec } from '../core/InputCodec'; // Importante!
+import { InputCodec } from '../core/InputCodec';
 
 interface Player {
     id: number;
-    ws: WebSocket;
+    ws: any;
     x: number; y: number;
     vx: number; vy: number;
     lastInputSeq: number;
 }
 
-class RealGameServer {
-    private players = new Map<number, Player>();
-    private nextPlayerId = 1;
-    private simulationHz = 60;
+const players = new Map<number, Player>();
+const wss = new WebSocketServer({ port: 8080 });
 
-    constructor(port = 8080) {
-        const wss = new WebSocketServer({ port });
-        console.log(`🚀 Aether-Titan Server rodando em ws://localhost:${port}`);
+console.log("🚀 Servidor Aether-Titan v9.1.0 ONLINE em ws://localhost:8080");
 
-        wss.on('connection', (ws) => {
-            const id = this.nextPlayerId++;
-            // Spawn no centro
-            this.players.set(id, { id, ws, x: 400, y: 300, vx: 0, vy: 0, lastInputSeq: 0 });
-            
-            ws.on('message', (data: Buffer) => this.handleInput(id, data));
-            ws.on('close', () => this.players.delete(id));
-        });
+wss.on('connection', (ws) => {
+    const id = Math.floor(Math.random() * 1000);
+    players.set(id, { id, ws, x: 400, y: 300, vx: 0, vy: 0, lastInputSeq: 0 });
 
-        // Loop de Snapshot (20Hz)
-        setInterval(() => this.broadcastSnapshots(), 1000 / 20);
-    }
-
-    private handleInput(playerId: number, raw: Buffer) {
-        const player = this.players.get(playerId);
+    ws.on('message', (data: Buffer) => {
+        const player = players.get(id);
         if (!player) return;
 
-        // DECODE BINÁRIO v9.1.0
-        const input = InputCodec.decode(new Uint8Array(raw));
-        if (!input) return;
-
-        const { inputSeq, dx, dy } = input;
-
-        // Simulação simples com trava de velocidade
-        player.vx = dx * 10; 
-        player.vy = dy * 10;
-        player.x += player.vx / this.simulationHz;
-        player.y += player.vy / this.simulationHz;
-        player.lastInputSeq = inputSeq;
-    }
-
-    private broadcastSnapshots() {
-        const ts = Date.now();
-        for (const player of this.players.values()) {
-            const snapId = ts & 0xFFFF;
-            const packet = SCS76Codec.encode(
-                player.x, player.y,
-                player.x - (player.vx/60), player.y - (player.vy/60),
-                player.vx, player.vy,
-                snapId, player.lastInputSeq, ts
-            );
-            player.ws.send(packet);
+        const input = InputCodec.decode(new Uint8Array(data));
+        if (input) {
+            player.x += input.dx;
+            player.y += input.dy;
+            player.lastInputSeq = input.inputSeq;
         }
-    }
-}
+    });
 
-new RealGameServer(8080);
+    ws.on('close', () => players.delete(id));
+});
+
+// Broadcast de Snapshots (20 FPS)
+setInterval(() => {
+    const ts = Date.now();
+    players.forEach(player => {
+        const packet = SCS76Codec.encode(
+            player.x, player.y, 
+            player.x, player.y, 
+            0, 0, 
+            ts & 0xFFFF, player.lastInputSeq, ts
+        );
+        player.ws.send(packet);
+    });
+}, 50);
