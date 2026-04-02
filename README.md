@@ -23,7 +23,7 @@ npm install @aether-titan/core
 # 1) Build TS to JS for browser importmap
 npx tsc core/*.ts transport/*.ts --target esnext --module esnext --moduleResolution node16
 
-# 2) Start server (binário)
+# 2) Start server (binary input)
 npx ts-node examples/server-real.ts
 
 # 3) Serve static files
@@ -34,8 +34,8 @@ http://localhost:3000/dashboard.html
 ```
 
 ### Auto-Stress Test (10s + report)
-- A demo dispara um teste automático após 1.5s, move diagonal, inverte direção aos 5s e gera um `.txt` com posição/seq a cada ~100ms.
-- Use latência/jitter/perda no dashboard para validar predição, reconciliação e interpolação.
+- The client auto-runs after 1.5s, moves diagonally, flips direction at 5s, ends at 10s, and downloads a `.txt` report with position/seq samples (~100ms).
+- Use latency/jitter/loss sliders in the dashboard to validate prediction, reconciliation, and interpolation.
 
 ---
 
@@ -44,15 +44,15 @@ http://localhost:3000/dashboard.html
 - `transport/`: WebSocket + connection manager + stub WebRTC.
 - `platforms/`: web-worker bridge, Unity bridge stub.
 - `native/`: CMake + minimal SCS76 encoder shim.
-- `examples/`: `server-real.ts` (binário), `client-demo.html` (auto-stress + report).
-- `dashboard.html`: painel para URL, simulação de rede, abrir demo e ler README.
+- `examples/`: `server-real.ts` (binary), `client-demo.html` (auto-stress + report).
+- `dashboard.html`: control panel for URL, net simulation, demo launch, and README viewer.
 
 ---
 
-## 🇧🇷 Resumo em Português
+## 🇧🇷 Versão em Português (resumo)
 - Instalação: `npm install @aether-titan/core`
 - Demo: `npx tsc core/*.ts transport/*.ts --target esnext --module esnext --moduleResolution node16 && npx ts-node examples/server-real.ts && npx http-server -p 3000` e abra `http://localhost:3000/dashboard.html`.
-- Teste automático: começa sozinho em 1.5s, inverte direção aos 5s, termina aos 10s e baixa relatório `.txt` com posições e seqs.
+- Teste automático: inicia em 1.5s, muda direção aos 5s, termina aos 10s e baixa um relatório `.txt` com posições e seqs a cada ~100ms.
 - Binário: servidor e cliente usam `InputCodec` (4 bytes) para inputs.
 
 © 2025 3eaCru – All rights reserved.
