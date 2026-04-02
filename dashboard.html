@@ -43,57 +43,56 @@
 
     <div class="grid">
         <div class="card">
-            <h2>🌐 Connection</h2>
+            <h2>🌐 Connection & Mode</h2>
             <div class="input-group">
-                <label>🔗 WebSocket Server URL</label>
-                <input type="text" id="serverUrl" placeholder="ws://localhost:8080" value="ws://localhost:8080">
+                <label>🕹️ Modo de Operação</label>
+                <select id="opMode">
+                    <option value="remote">🌐 Remote Server (Node.js)</option>
+                    <option value="local">🤖 Standalone Auto-Test (Mock)</option>
+                </select>
+            </div>
+            <div id="remoteUrlGroup" class="input-group">
+                <label>🔗 Server URL</label>
+                <input type="text" id="serverUrl" value="ws://localhost:8080">
             </div>
             <div class="flex-buttons">
-                <button id="saveServerBtn" class="primary">💾 Salvar & Aplicar</button>
-                <button id="resetServerBtn">↺ Restaurar padrão</button>
+                <button id="launchDemoBtn" class="primary">▶️ Iniciar Simulação</button>
+                <button id="saveServerBtn">💾 Salvar Config</button>
             </div>
-            <div class="dev-panel">
-                <h3>🛠️ Dev Options (simulação de rede)</h3>
-                <div class="slider-group">
-                    <div class="slider-item">
-                        <label>📡 Latência (ms)</label>
-                        <input type="range" id="latencySlider" min="0" max="300" value="0" step="5">
-                        <span id="latencyValue" class="value-display">0 ms</span>
-                    </div>
-                    <div class="slider-item">
-                        <label>⚠️ Jitter (±ms)</label>
-                        <input type="range" id="jitterSlider" min="0" max="100" value="0" step="2">
-                        <span id="jitterValue" class="value-display">0 ms</span>
-                    </div>
-                    <div class="slider-item">
-                        <label>📉 Packet loss (%)</label>
-                        <input type="range" id="lossSlider" min="0" max="20" value="0" step="1">
-                        <span id="lossValue" class="value-display">0 %</span>
-                    </div>
+        </div>
+
+        <div class="card">
+            <h2>📊 Engine Telemetry</h2>
+            <div class="dev-panel" style="border-left-color: #7c9eff;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                    <span>Predição: <b id="statPredict" style="color:#0f0">ATIVA</b></span>
+                    <span>Interpolação: <b id="statInterp" style="color:#7c9eff">80ms</b></span>
                 </div>
-                <div style="margin-top: 12px;">
-                    <canvas id="latencySpark" width="300" height="40" style="width:100%; max-width:300px; background:#0a0c10; border-radius:8px;"></canvas>
-                </div>
-                <div class="flex-buttons" style="margin-top: 12px;">
-                    <button id="applyDevSettings">✅ Aplicar à Demo</button>
-                    <button id="resetDevSettings">♻️ Zerar simulação</button>
+                <label>📈 Latência Estabilizada</label>
+                <canvas id="latencySpark" width="300" height="50" style="width:100%; background:#000; border-radius:8px; margin-bottom:10px;"></canvas>
+                
+                <div style="font-size: 0.8rem; color: #8a8f9a;">
+                    <p>• Codec: <span class="value-display">SCS-76 v0.77 (Delta)</span></p>
+                    <p>• Input: <span class="value-display">Binary 4-bytes</span></p>
                 </div>
             </div>
         </div>
 
         <div class="card">
-            <h2>🎮 Launch & Tools</h2>
-            <p>Inicie a demonstração jogável com as configurações atuais.</p>
-            <div class="flex-buttons" style="margin-top: 16px;">
-                <button id="launchDemoBtn" class="primary">▶️ Abrir Demo Interativa</button>
-                <button id="openReadmeBtn">📄 Ver README.md</button>
+            <h2>🛠️ Network Stress</h2>
+            <div class="slider-group">
+                <div class="slider-item">
+                    <label>📡 Latência: <span id="latencyValue" class="value-display">0 ms</span></label>
+                    <input type="range" id="latencySlider" min="0" max="500" value="0">
+                </div>
+                <div class="slider-item">
+                    <label>⚠️ Jitter: <span id="jitterValue" class="value-display">0 ms</span></label>
+                    <input type="range" id="jitterSlider" min="0" max="150" value="0">
+                </div>
             </div>
-            <hr style="margin: 1.2rem 0; border-color:#262b36;">
-            <p><strong>📦 Estado atual:</strong><br>
-            Servidor: <span id="currentServerDisplay">ws://localhost:8080</span><br>
-            Simulação: <span id="currentSimDisplay">Latência 0ms, Jitter 0ms, Loss 0%</span>
-            </p>
-            <button id="clearStorageBtn" style="background:#2a1e2a;">🧹 Limpar configurações salvas</button>
+            <div class="flex-buttons" style="margin-top: 15px;">
+                <button id="resetDevSettings" style="width: 100%;">♻️ Resetar Condições de Rede</button>
+            </div>
         </div>
     </div>
 
@@ -122,15 +121,21 @@
     const openReadmeBtn = document.getElementById('openReadmeBtn');
     const clearStorageBtn = document.getElementById('clearStorageBtn');
     const readmeContainer = document.getElementById('readmeContent');
+    const opMode = document.getElementById('opMode');
+    const remoteUrlGroup = document.getElementById('remoteUrlGroup');
 
     const STORAGE_KEYS = {
         serverUrl: 'aether_server_url',
         devLatency: 'aether_dev_latency',
         devJitter: 'aether_dev_jitter',
-        devLoss: 'aether_dev_loss'
+        devLoss: 'aether_dev_loss',
+        opMode: 'aether_op_mode'
     };
 
     function loadSettings() {
+        const savedMode = localStorage.getItem(STORAGE_KEYS.opMode);
+        if (savedMode) opMode.value = savedMode;
+        remoteUrlGroup.style.display = opMode.value === 'remote' ? 'block' : 'none';
         const savedServer = localStorage.getItem(STORAGE_KEYS.serverUrl);
         if (savedServer) serverInput.value = savedServer;
         currentServerSpan.innerText = serverInput.value;
@@ -160,6 +165,11 @@
         if (url) localStorage.setItem(STORAGE_KEYS.serverUrl, url);
         currentServerSpan.innerText = url;
     }
+
+    opMode.addEventListener('change', () => {
+        remoteUrlGroup.style.display = opMode.value === 'remote' ? 'block' : 'none';
+        localStorage.setItem(STORAGE_KEYS.opMode, opMode.value);
+    });
 
     function saveDevSettings() {
         localStorage.setItem(STORAGE_KEYS.devLatency, latencySlider.value);
@@ -195,12 +205,18 @@
 
     function launchDemo() {
         const serverUrl = serverInput.value.trim();
-        if (!serverUrl) { alert('Defina uma URL de servidor WebSocket primeiro.'); return; }
+        if (opMode.value === 'remote' && !serverUrl) { alert('Defina uma URL de servidor WebSocket.'); return; }
         localStorage.setItem(STORAGE_KEYS.serverUrl, serverUrl);
-        const devOpts = { latency: parseInt(latencySlider.value), jitter: parseInt(jitterSlider.value), loss: parseInt(lossSlider.value) };
+        localStorage.setItem(STORAGE_KEYS.opMode, opMode.value);
+        const devOpts = {
+            mode: opMode.value,
+            latency: parseInt(latencySlider.value),
+            jitter: parseInt(jitterSlider.value),
+            loss: parseInt(lossSlider.value),
+            server: serverUrl
+        };
         sessionStorage.setItem('aether_demo_config', JSON.stringify(devOpts));
-        const params = new URLSearchParams({ server: serverUrl, latency: devOpts.latency, jitter: devOpts.jitter, loss: devOpts.loss });
-        window.open(`./examples/client-demo.html?${params.toString()}`, '_blank');
+        window.open(`./examples/client-demo.html`, '_blank');
     }
 
     async function loadReadme() {
