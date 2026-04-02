@@ -1,0 +1,200 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aether-Titan v9.1.0 | Pro Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background: #0a0a0a; color: #e5e7eb; overflow: hidden; }
+        .glass { background: rgba(17, 17, 17, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); }
+        .canvas-container { position: relative; width: 100%; height: 500px; background: #111; border-radius: 1rem; overflow: hidden; border: 1px solid #222; }
+        input[type="range"] { accent-color: #3b82f6; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        .badge { padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: bold; text-transform: uppercase; }
+    </style>
+</head>
+<body class="h-screen flex flex-col p-6">
+
+    <header class="flex justify-between items-center mb-6">
+        <div>
+            <h1 class="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent italic">AETHER-TITAN v9.1.0</h1>
+            <p class="text-gray-500 text-xs uppercase tracking-widest">Advanced Networking Simulation & QA</p>
+        </div>
+        <div class="flex gap-4">
+            <div class="glass px-4 py-2 rounded-xl flex items-center gap-3">
+                <div id="statusDot" class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                <span id="networkHealth" class="text-sm font-semibold">Health: 100%</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex flex-1 gap-6 overflow-hidden">
+        
+        <section class="flex-1 flex flex-col gap-4">
+            <div class="canvas-container shadow-2xl">
+                <canvas id="gameCanvas"></canvas>
+                
+                <div class="absolute bottom-4 left-4 flex gap-4 pointer-events-none">
+                    <div class="glass px-3 py-1.5 rounded-lg flex items-center gap-2">
+                        <div class="w-3 h-3 rounded-full bg-blue-500"></div>
+                        <span class="text-[10px] text-gray-400">Player (Predicted)</span>
+                    </div>
+                    <div class="glass px-3 py-1.5 rounded-lg flex items-center gap-2">
+                        <div class="w-3 h-3 rounded-full bg-purple-500 opacity-50"></div>
+                        <span class="text-[10px] text-gray-400">Server (Reconciled)</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass p-4 rounded-2xl flex-1 flex flex-col justify-center">
+                <h3 class="text-xs font-bold text-gray-500 mb-2 uppercase">Jitter Buffer / Latency Sparkline</h3>
+                <canvas id="sparkline" height="60"></canvas>
+            </div>
+        </section>
+
+        <aside class="w-80 flex flex-col gap-4">
+            <div class="glass p-5 rounded-2xl flex flex-col gap-4">
+                <h2 class="text-sm font-bold flex items-center gap-2">🛠️ Simulation Config</h2>
+                
+                <div>
+                    <div class="flex justify-between text-xs mb-2">
+                        <span>Latency</span>
+                        <span class="text-blue-400 mono" id="latVal">100ms</span>
+                    </div>
+                    <input type="range" id="latSlider" class="w-full" min="0" max="500" value="100">
+                </div>
+
+                <div>
+                    <div class="flex justify-between text-xs mb-2">
+                        <span>Jitter</span>
+                        <span class="text-blue-400 mono" id="jitVal">20ms</span>
+                    </div>
+                    <input type="range" id="jitSlider" class="w-full" min="0" max="150" value="20">
+                </div>
+
+                <div class="flex gap-2 mt-2">
+                    <button id="btnAutoTest" class="flex-1 bg-blue-600 hover:bg-blue-500 py-3 rounded-xl font-bold text-xs transition-all shadow-lg shadow-blue-900/20">
+                        🔥 START 10s TEST
+                    </button>
+                    <button id="btnReset" class="px-4 bg-white/5 hover:bg-white/10 rounded-xl transition-all">♻️</button>
+                </div>
+            </div>
+
+            <div class="glass p-5 rounded-2xl border-l-4 border-green-500">
+                <h3 class="text-green-400 font-bold text-xs mb-2 italic underline">CORE ACTIVE: v9.1.0</h3>
+                <ul class="text-[10px] text-gray-400 flex flex-col gap-2 leading-relaxed">
+                    <li>• <b class="text-gray-200">SCS-76 Codec:</b> Delta compression enabled.</li>
+                    <li>• <b class="text-gray-200">Reconciliation:</b> Visual error smoothing active.</li>
+                    <li>• <b class="text-gray-200">Mock Server:</b> Local loopback simulation.</li>
+                </ul>
+            </div>
+
+            <div class="glass flex-1 p-4 rounded-2xl overflow-y-auto">
+                <h3 class="text-[10px] font-bold text-gray-600 uppercase mb-2">System Log</h3>
+                <div id="log" class="text-[10px] mono text-gray-500 space-y-1"></div>
+            </div>
+        </aside>
+    </main>
+
+    <script>
+        const config = { latency: 100, jitter: 20 };
+        let player = { x: 400, y: 250 };
+        let serverPos = { x: 400, y: 250 };
+        let isTesting = false;
+        const logsHistory = [];
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const spark = document.getElementById('sparkline').getContext('2d');
+        const logEl = document.getElementById('log');
+
+        function log(msg) {
+            const div = document.createElement('div');
+            div.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            logEl.prepend(div);
+        }
+
+        // MOCK SERVER -------------------------------------------------
+        function sendToMockServer(dx, dy) {
+            // Predição imediata
+            player.x += dx; player.y += dy;
+            const delay = config.latency + (Math.random() * config.jitter);
+            setTimeout(() => {
+                serverPos.x += dx;
+                serverPos.y += dy;
+                logsHistory.push(delay);
+                log(`ACK ${serverPos.x.toFixed(0)}, ${serverPos.y.toFixed(0)} @${delay.toFixed(0)}ms`);
+            }, delay);
+        }
+
+        // AUTO TEST 10s ------------------------------------------------
+        async function runAutoTest() {
+            if (isTesting) return;
+            isTesting = true;
+            log('🔥 STARTING 10s STRESS TEST...');
+            const report = [];
+            const start = performance.now();
+            const loop = setInterval(() => {
+                const t = performance.now() - start;
+                let dx = 3, dy = 3;
+                if (t > 5000) dy = -3;
+                sendToMockServer(dx, dy);
+                report.push({ t, px: player.x, sx: serverPos.x });
+                if (t >= 10000) {
+                    clearInterval(loop);
+                    isTesting = false;
+                    log('✅ TEST FINISHED. DOWNLOADING REPORT...');
+                    downloadReport(report);
+                }
+            }, 50);
+        }
+
+        function downloadReport(data) {
+            const content = 'AETHER-TITAN QA REPORT\n' + data.map(d => `${d.t.toFixed(0)}ms | ClientX: ${d.px.toFixed(2)} | ServerX: ${d.sx.toFixed(2)}`).join('\n');
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'aether_report.txt'; a.click();
+        }
+
+        // RENDER ------------------------------------------------------
+        function drawSpark() {
+            spark.canvas.width = spark.canvas.clientWidth;
+            spark.canvas.height = spark.canvas.clientHeight;
+            spark.clearRect(0,0,spark.canvas.width,spark.canvas.height);
+            spark.strokeStyle = '#3b82f6'; spark.lineWidth = 1.5; spark.beginPath();
+            const data = logsHistory.slice(-60);
+            data.forEach((v,i)=>{
+                const x = (i/(data.length-1||1))*spark.canvas.width;
+                const y = spark.canvas.height - (Math.min(500,v)/500)*spark.canvas.height;
+                if(i===0) spark.moveTo(x,y); else spark.lineTo(x,y);
+            });
+            spark.stroke();
+        }
+
+        function draw() {
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+            // server shadow
+            ctx.globalAlpha = 0.3; ctx.fillStyle = '#a855f7'; ctx.beginPath(); ctx.arc(serverPos.x, serverPos.y, 15, 0, Math.PI*2); ctx.fill();
+            // player
+            ctx.globalAlpha = 1; ctx.fillStyle = '#3b82f6'; ctx.shadowBlur=15; ctx.shadowColor='#3b82f6'; ctx.beginPath(); ctx.arc(player.x, player.y, 12, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur=0;
+            requestAnimationFrame(draw);
+        }
+
+        // EVENTS ------------------------------------------------------
+        document.getElementById('latSlider').oninput = (e)=>{config.latency=parseInt(e.target.value); document.getElementById('latVal').innerText=e.target.value+'ms';};
+        document.getElementById('jitSlider').oninput = (e)=>{config.jitter=parseInt(e.target.value); document.getElementById('jitVal').innerText=e.target.value+'ms';};
+        document.getElementById('btnAutoTest').onclick = runAutoTest;
+        document.getElementById('btnReset').onclick = ()=>{player={x:400,y:250}; serverPos={x:400,y:250}; logsHistory.length=0; log('♻️ System Reset'); drawSpark();};
+        window.onkeydown = (e)=>{ if(isTesting) return; if(e.key==='ArrowRight'||e.key==='d') sendToMockServer(10,0); if(e.key==='ArrowLeft'||e.key==='a') sendToMockServer(-10,0); if(e.key==='ArrowDown'||e.key==='s') sendToMockServer(0,10); if(e.key==='ArrowUp'||e.key==='w') sendToMockServer(0,-10); };
+
+        setInterval(drawSpark, 200);
+        draw();
+        log('System Ready. Use WASD or Start Test.');
+    </script>
+</body>
+</html>
