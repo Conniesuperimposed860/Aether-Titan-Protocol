@@ -73,8 +73,18 @@
         const transport = new WebSocketTransport();
         const connMgr = new ConnectionManager(transport);
         const interpolator = new AetherInterpolator();
+        const useMockServer = true; // 🛠️ Ative para autoteste local sem Node.js
 
-        // Intercepta o send do transporte para aplicar simulação de rede
+        // Armazena handler de mensagens para uso no mock
+        let inboundHandler = null;
+        const originalOnMessage = transport.onMessage.bind(transport);
+        transport.onMessage((raw) => {}); // init
+        transport.onMessage = (handler) => {
+            inboundHandler = handler;
+            originalOnMessage(handler);
+        };
+
+        // Intercepta o send do transporte para simulação de rede ou mock
         const originalSend = transport.send.bind(transport);
         transport.send = (data) => {
             if (Math.random() * 100 < CONFIG.loss) {
@@ -82,6 +92,30 @@
                 return;
             }
             const delay = CONFIG.latency + (Math.random() * CONFIG.jitter * 2 - CONFIG.jitter);
+
+            // Mock server interno
+            if (useMockServer) {
+                const mockState = transport.__mockState || { x: 400, y: 300 };
+                transport.__mockState = mockState;
+                const input = InputCodec.decode(new Uint8Array(data));
+                if (!input) return;
+                mockState.x += input.dx;
+                mockState.y += input.dy;
+                const responder = () => {
+                    const ts = Date.now();
+                    const packet = SCS76Codec.encode(
+                        mockState.x, mockState.y,
+                        mockState.x, mockState.y,
+                        0, 0,
+                        ts & 0xFFFF, input.inputSeq, ts
+                    );
+                    inboundHandler && inboundHandler(packet.buffer);
+                };
+                if (delay <= 0) responder(); else setTimeout(responder, delay);
+                return;
+            }
+
+            // Modo normal (rede real)
             if (delay <= 0) originalSend(data);
             else setTimeout(() => originalSend(data), delay);
         };
@@ -155,56 +189,43 @@
             setTimeout(inputLoop, 10);
         }
 
-        // --- AUTO-STRESS TESTER v9.1.0 (Com Geração de Report) ---
-        async function runExtendedAutoTest() {
-            const logs: Array<{ time: string; posX: string; posY: string; inputSeq: number }> = [];
+        // --- AUTO-STRESS TESTER (mock-aware, 10s, report) ---
+        async function runAutoFunctionTest() {
+            const logs = [];
             const startTime = performance.now();
-            
             keys.ArrowDown = true;
             keys.ArrowRight = true;
-            
             const monitor = setInterval(() => {
                 const elapsed = performance.now() - startTime;
-                
-                // Coleta dados a cada ~100ms para o relatório
                 if (Math.floor(elapsed) % 100 < 16) {
                     logs.push({
                         time: (elapsed / 1000).toFixed(2),
                         posX: playerState.x.toFixed(2),
                         posY: playerState.y.toFixed(2),
-                        inputSeq: inputSeq
+                        seq: inputSeq
                     });
                 }
-
-                // Mudança de direção no meio do teste (5s) para testar predição
                 if (elapsed >= 5000 && keys.ArrowDown) {
                     keys.ArrowDown = false;
                     keys.ArrowUp = true;
                 }
-
-                // FIM DO TESTE: 10 segundos
                 if (elapsed >= 10000) {
                     clearInterval(monitor);
                     keys.ArrowUp = false;
                     keys.ArrowRight = false;
-                    
                     generateReportFile(logs);
                 }
             }, 16);
         }
 
-        // --- FUNÇÃO: GERADOR DE ARQUIVO DE RELATÓRIO ---
         function generateReportFile(data) {
-            const reportHeader = `=== AETHER-TITAN PROTOCOL REPORT ===\\n` +
-                                 `Data: ${new Date().toLocaleString()}\\n` +
-                                 `Config: Latency=${CONFIG.latency}ms, Jitter=${CONFIG.jitter}ms, Loss=${CONFIG.loss}%\\n` +
-                                 `------------------------------------\\n\\n`;
-            
-            const tableHeader = "Tempo(s) | PosX | PosY | Seq\\n";
-            const rows = data.map(d => `${d.time}s | ${d.posX} | ${d.posY} | ${d.inputSeq}`).join('\\n');
-            
+            const reportHeader = `=== AETHER-TITAN PROTOCOL REPORT ===\n` +
+                                 `Data: ${new Date().toLocaleString()}\n` +
+                                 `Config: Latency=${CONFIG.latency}ms, Jitter=${CONFIG.jitter}ms, Loss=${CONFIG.loss}%\n` +
+                                 `------------------------------------\n\n`;
+            const tableHeader = "Tempo(s) | PosX | PosY | Seq\n";
+            const rows = data.map(d => `${d.time}s | ${d.posX} | ${d.posY} | ${d.seq}`).join('\n');
             const finalContent = reportHeader + tableHeader + rows;
-            
             const blob = new Blob([finalContent], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -213,26 +234,31 @@
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
-            
             console.log("📂 Relatório gerado e baixado com sucesso!");
         }
-
-        // Aguarda 1.5s para garantir que o socket estabilizou
-        setTimeout(runExtendedAutoTest, 1500);
 
         window.addEventListener('keydown', (e) => { if (keys.hasOwnProperty(e.key)) keys[e.key] = true; });
         window.addEventListener('keyup', (e) => { if (keys.hasOwnProperty(e.key)) keys[e.key] = false; });
 
-        // Conecta e inicia
-        try {
-            await connMgr.connect(CONFIG.serverUrl);
-            console.log('✅ Conectado ao servidor');
-            gameLoop();
-            inputLoop();
-        } catch (err) {
-            debugDiv.innerHTML = `❌ Falha na conexão: ${err.message}`;
-            console.error(err);
-        }
+        (async () => {
+            if (useMockServer) {
+                console.warn("🛠️ MODO AUTOTESTE LOCAL ATIVADO: Servidor fantasma interno.");
+                gameLoop();
+                inputLoop();
+                setTimeout(runAutoFunctionTest, 1000);
+                return;
+            }
+            try {
+                await connMgr.connect(CONFIG.serverUrl);
+                console.log('✅ Conectado ao servidor');
+                gameLoop();
+                inputLoop();
+                setTimeout(runAutoFunctionTest, 1500);
+            } catch (err) {
+                debugDiv.innerHTML = `❌ Falha na conexão: ${err.message}`;
+                console.error(err);
+            }
+        })();
     </script>
 </body>
 </html>
