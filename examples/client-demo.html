@@ -1,0 +1,113 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title>Aether-Titan Demo v9.1.0</title>
+    <style>
+        canvas { border: 1px solid black; background: #111; }
+        #debug { font-family: monospace; color: lime; background: black; padding: 5px; margin-top: 5px; }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <div id="debug">Connecting...</div>
+    <script type="module">
+        import { SCS76Codec } from '../dist/core/SCS76_Codec.js';
+        import { ClientPrediction } from '../dist/core/ClientPrediction.js';
+        import { Reconciliation } from '../dist/core/Reconciliation.js';
+        import { RollbackSystem } from '../dist/core/RollbackSystem.js';
+        import { NetworkHealth } from '../dist/core/NetworkHealth.js';
+        import { WebSocketTransport } from '../dist/transport/WebSocketTransport.js';
+        import { ConnectionManager } from '../dist/transport/ConnectionManager.js';
+        import { InputCodec } from '../dist/core/InputCodec.js';
+        import { AetherInterpolator } from '../dist/core/AetherInterpolator.js';
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const debugDiv = document.getElementById('debug');
+
+        let playerState = { x: 400, y: 300, vx: 0, vy: 0 };
+        let lastServerState = { x: 400, y: 300 };
+        let lastProcessedInputSeq = 0;
+        let inputSeq = 0;
+
+        const prediction = new ClientPrediction();
+        const reconciliation = new Reconciliation();
+        const rollback = new RollbackSystem();
+        const transport = new WebSocketTransport();
+        const connMgr = new ConnectionManager(transport);
+        const interpolator = new AetherInterpolator();
+
+        const keys = { ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
+        let lastSendTime = 0;
+        let lastRenderTime = performance.now();
+
+        function sendInput() {
+            let dx = 0, dy = 0;
+            if (keys.ArrowUp) dy -= 5;
+            if (keys.ArrowDown) dy += 5;
+            if (keys.ArrowLeft) dx -= 5;
+            if (keys.ArrowRight) dx += 5;
+            if (dx === 0 && dy === 0) return;
+
+            inputSeq++;
+            prediction.applyInput(inputSeq, dx, dy, playerState);
+            const inputPacket = InputCodec.encode(inputSeq, dx, dy);
+            transport.send(inputPacket.buffer);
+        }
+
+        transport.onMessage(async (raw) => {
+            const buffer = new Uint8Array(raw);
+            const decoded = SCS76Codec.decode(buffer, lastServerState, { x: 0, y: 0 }, 16.66);
+            if (!decoded) return;
+            const { x, y, ackInputSeq, ts } = decoded;
+            lastServerState = { x, y };
+            interpolator.push({ x, y, timestampMs: ts });
+
+            const predicted = prediction.getState(ackInputSeq);
+            if (predicted) {
+                const corrected = reconciliation.reconcile(lastServerState, predicted);
+                playerState.x = corrected.x;
+                playerState.y = corrected.y;
+                rollback.saveState(ackInputSeq, { ...playerState, vx: 0, vy: 0 });
+                prediction.clearOldUpTo(ackInputSeq);
+            }
+
+            const metrics = { jitter: 5, loss: 0, latency: 20 };
+            const health = NetworkHealth.compute(metrics);
+            debugDiv.innerHTML = `Pos: (${playerState.x.toFixed(1)}, ${playerState.y.toFixed(1)}) | Saúde: ${health} | AckSeq: ${ackInputSeq}`;
+        });
+
+        function gameLoop() {
+            const now = performance.now();
+            const delta = Math.min(33, now - lastRenderTime);
+            lastRenderTime = now;
+
+            reconciliation.updateVisual(delta);
+            const renderPos = interpolator.getInterpolated(now);
+            const drawX = renderPos ? renderPos.x : playerState.x;
+            const drawY = renderPos ? renderPos.y : playerState.y;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'cyan';
+            ctx.fillRect(drawX - 10, drawY - 10, 20, 20);
+            requestAnimationFrame(gameLoop);
+        }
+
+        function inputLoop() {
+            const now = Date.now();
+            if (now - lastSendTime > 16) {
+                sendInput();
+                lastSendTime = now;
+            }
+            setTimeout(inputLoop, 10);
+        }
+
+        window.addEventListener('keydown', (e) => { if (keys.hasOwnProperty(e.key)) keys[e.key] = true; });
+        window.addEventListener('keyup', (e) => { if (keys.hasOwnProperty(e.key)) keys[e.key] = false; });
+
+        await connMgr.connect('ws://localhost:8080');
+        gameLoop();
+        inputLoop();
+    </script>
+</body>
+</html>

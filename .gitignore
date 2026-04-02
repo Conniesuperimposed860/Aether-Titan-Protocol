@@ -1,4 +1,4 @@
-# Prerequisites
+﻿# Prerequisites
 *.d
 
 # Compiled Object files
@@ -39,3 +39,10 @@
 
 # debug information files
 *.dwo
+
+# Node / build artifacts
+node_modules/
+aether-titan-v9.1.0.zip
+aether-titan-v9.1.0/
+npm-debug.log*
+*.lock
