@@ -17,6 +17,10 @@
         return diff;
     }
 
+    static isOlderOrEqual(seq: number, lastSeq: number): boolean {
+        return !this.isNewer(seq, lastSeq);
+    }
+
     static encode(
         x: number, y: number,
         lastX: number, lastY: number,

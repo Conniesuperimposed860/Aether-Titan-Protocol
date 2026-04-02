@@ -1,4 +1,4 @@
-﻿import { WebSocketServer, WebSocket, RawData } from 'ws';
+﻿import { WebSocketServer, WebSocket } from 'ws';
 import { SCS76Codec } from '../core/SCS76_Codec';
 import { InputCodec } from '../core/InputCodec';
 
@@ -21,10 +21,10 @@ class RealGameServer {
         const wss = new WebSocketServer({ port });
         console.log(`Server running on ws://localhost:${port}`);
 
-        wss.on('connection', (ws: WebSocket) => {
+        wss.on('connection', (ws) => {
             const id = this.nextPlayerId++;
             this.players.set(id, { id, ws, x: 0, y: 0, vx: 0, vy: 0, lastInputSeq: 0 });
-            ws.on('message', (data: RawData) => this.handleInput(id, data as Buffer));
+            ws.on('message', (data) => this.handleInput(id, data));
             ws.on('close', () => this.players.delete(id));
         });
 

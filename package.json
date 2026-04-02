@@ -1,30 +1,20 @@
-{
+﻿{
   "name": "@aether-titan/core",
   "version": "9.1.0",
   "description": "Professional netcode: delta compression, prediction, reconciliation, rollback, jitter buffer, interest management, WebSocket, demo included.",
-  "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "demo": "npm run build && node dist/examples/server-real.js & npx http-server -p 3000",
+    "demo": "node examples/server-real.js & npx http-server -p 3000",
     "benchmark": "ts-node examples/benchmark.ts"
   },
-  "keywords": [
-    "netcode",
-    "multiplayer",
-    "prediction",
-    "rollback",
-    "websocket"
-  ],
+  "keywords": ["netcode", "multiplayer", "prediction", "rollback", "websocket"],
   "author": "Marcelo A. Ferreira Jr - 3eaCru",
   "license": "SEE LICENSE IN LICENSE.txt",
   "devDependencies": {
-    "@types/node": "^22.0.0",
-    "@types/ws": "^8.18.1",
-    "http-server": "^14.1.0",
-    "ts-node": "^10.9.2",
     "typescript": "^5.0.0",
-    "ws": "^8.14.0"
+    "ws": "^8.14.0",
+    "http-server": "^14.1.0"
   }
 }

@@ -1,34 +1,71 @@
 ﻿<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Aether-Titan Demo v9.1.0</title>
+    <meta charset="UTF-8">
+    <title>Aether-Titan Demo – Client</title>
     <style>
-        canvas { border: 1px solid black; background: #111; }
-        #debug { font-family: monospace; color: lime; background: black; padding: 5px; margin-top: 5px; }
+        body { margin: 0; background: #111; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: monospace; }
+        canvas { border: 2px solid #3c6eff; background: #1e1e2e; box-shadow: 0 0 20px rgba(60,110,255,0.2); }
+        #debug { position: fixed; top: 10px; left: 10px; background: rgba(0,0,0,0.7); color: #0f0; padding: 8px 12px; border-radius: 8px; font-size: 12px; z-index: 100; pointer-events: none; backdrop-filter: blur(4px); }
+        #sim-badge { position: fixed; bottom: 10px; left: 10px; background: #2a1e2a; color: #ffb74d; padding: 4px 10px; border-radius: 20px; font-size: 10px; }
     </style>
 </head>
 <body>
     <canvas id="gameCanvas" width="800" height="600"></canvas>
-    <div id="debug">Connecting...</div>
-    <script type="module">
-        import { SCS76Codec } from '../dist/core/SCS76_Codec.js';
-        import { ClientPrediction } from '../dist/core/ClientPrediction.js';
-        import { Reconciliation } from '../dist/core/Reconciliation.js';
-        import { RollbackSystem } from '../dist/core/RollbackSystem.js';
-        import { NetworkHealth } from '../dist/core/NetworkHealth.js';
-        import { WebSocketTransport } from '../dist/transport/WebSocketTransport.js';
-        import { ConnectionManager } from '../dist/transport/ConnectionManager.js';
-        import { InputCodec } from '../dist/core/InputCodec.js';
-        import { AetherInterpolator } from '../dist/core/AetherInterpolator.js';
+    <div id="debug">🔌 Connecting...</div>
+    <div id="sim-badge">⚙️ Sim: 0ms / 0ms / 0%</div>
 
+    <script type="importmap">
+        {
+            "imports": {
+                "../core/SCS76_Codec.js": "../core/SCS76_Codec.js",
+                "../core/ClientPrediction.js": "../core/ClientPrediction.js",
+                "../core/Reconciliation.js": "../core/Reconciliation.js",
+                "../core/RollbackSystem.js": "../core/RollbackSystem.js",
+                "../core/NetworkHealth.js": "../core/NetworkHealth.js",
+                "../transport/WebSocketTransport.js": "../transport/WebSocketTransport.js",
+                "../transport/ConnectionManager.js": "../transport/ConnectionManager.js",
+                "../core/InputCodec.js": "../core/InputCodec.js",
+                "../core/AetherInterpolator.js": "../core/AetherInterpolator.js"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import { SCS76Codec } from '../core/SCS76_Codec.js';
+        import { ClientPrediction } from '../core/ClientPrediction.js';
+        import { Reconciliation } from '../core/Reconciliation.js';
+        import { RollbackSystem } from '../core/RollbackSystem.js';
+        import { NetworkHealth } from '../core/NetworkHealth.js';
+        import { WebSocketTransport } from '../transport/WebSocketTransport.js';
+        import { ConnectionManager } from '../transport/ConnectionManager.js';
+        import { InputCodec } from '../core/InputCodec.js';
+        import { AetherInterpolator } from '../core/AetherInterpolator.js';
+
+        // ---------- Integração com Dashboard ----------
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionCfg = JSON.parse(sessionStorage.getItem('aether_demo_config') || '{}');
+        const savedServer = localStorage.getItem('aether_server_url');
+
+        const CONFIG = {
+            serverUrl: urlParams.get('server') || savedServer || 'ws://localhost:8080',
+            latency: parseInt(urlParams.get('latency')) || sessionCfg.latency || 0,
+            jitter: parseInt(urlParams.get('jitter')) || sessionCfg.jitter || 0,
+            loss: parseInt(urlParams.get('loss')) || sessionCfg.loss || 0
+        };
+
+        console.log('🚀 Aether-Titan Demo | Config:', CONFIG);
+        document.getElementById('sim-badge').innerHTML = `🧪 Sim: ${CONFIG.latency}ms ±${CONFIG.jitter}ms | Loss ${CONFIG.loss}%`;
+
+        // ---------- Setup dos módulos ----------
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const debugDiv = document.getElementById('debug');
 
         let playerState = { x: 400, y: 300, vx: 0, vy: 0 };
         let lastServerState = { x: 400, y: 300 };
-        let lastProcessedInputSeq = 0;
         let inputSeq = 0;
+        let lastSendTime = 0;
 
         const prediction = new ClientPrediction();
         const reconciliation = new Reconciliation();
@@ -37,9 +74,20 @@
         const connMgr = new ConnectionManager(transport);
         const interpolator = new AetherInterpolator();
 
+        // Intercepta o send do transporte para aplicar simulação de rede
+        const originalSend = transport.send.bind(transport);
+        transport.send = (data) => {
+            if (Math.random() * 100 < CONFIG.loss) {
+                console.warn('📦 Packet lost (simulated)');
+                return;
+            }
+            const delay = CONFIG.latency + (Math.random() * CONFIG.jitter * 2 - CONFIG.jitter);
+            if (delay <= 0) originalSend(data);
+            else setTimeout(() => originalSend(data), delay);
+        };
+
+        // Controles
         const keys = { ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
-        let lastSendTime = 0;
-        let lastRenderTime = performance.now();
 
         function sendInput() {
             let dx = 0, dy = 0;
@@ -48,13 +96,13 @@
             if (keys.ArrowLeft) dx -= 5;
             if (keys.ArrowRight) dx += 5;
             if (dx === 0 && dy === 0) return;
-
             inputSeq++;
             prediction.applyInput(inputSeq, dx, dy, playerState);
-            const inputPacket = InputCodec.encode(inputSeq, dx, dy);
-            transport.send(inputPacket.buffer);
+            const packet = InputCodec.encode(inputSeq, dx, dy);
+            transport.send(packet.buffer);
         }
 
+        // Mensagens do servidor (snapshots)
         transport.onMessage(async (raw) => {
             const buffer = new Uint8Array(raw);
             const decoded = SCS76Codec.decode(buffer, lastServerState, { x: 0, y: 0 }, 16.66);
@@ -74,25 +122,30 @@
 
             const metrics = { jitter: 5, loss: 0, latency: 20 };
             const health = NetworkHealth.compute(metrics);
-            debugDiv.innerHTML = `Pos: (${playerState.x.toFixed(1)}, ${playerState.y.toFixed(1)}) | Saúde: ${health} | AckSeq: ${ackInputSeq}`;
+            debugDiv.innerHTML = `📍 Pos: (${playerState.x.toFixed(1)}, ${playerState.y.toFixed(1)}) | ❤️ Saúde: ${health} | 🧾 AckSeq: ${ackInputSeq}`;
         });
 
+        // Loop de renderização com interpolação
+        let lastRenderTime = performance.now();
         function gameLoop() {
             const now = performance.now();
             const delta = Math.min(33, now - lastRenderTime);
             lastRenderTime = now;
-
             reconciliation.updateVisual(delta);
             const renderPos = interpolator.getInterpolated(now);
             const drawX = renderPos ? renderPos.x : playerState.x;
             const drawY = renderPos ? renderPos.y : playerState.y;
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = 'cyan';
-            ctx.fillRect(drawX - 10, drawY - 10, 20, 20);
+            ctx.fillStyle = '#3c6eff';
+            ctx.fillRect(drawX - 12, drawY - 12, 24, 24);
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 14px monospace';
+            ctx.fillText('🐺', drawX-6, drawY-8);
             requestAnimationFrame(gameLoop);
         }
 
+        // Loop de envio de inputs (60hz)
         function inputLoop() {
             const now = Date.now();
             if (now - lastSendTime > 16) {
@@ -105,9 +158,16 @@
         window.addEventListener('keydown', (e) => { if (keys.hasOwnProperty(e.key)) keys[e.key] = true; });
         window.addEventListener('keyup', (e) => { if (keys.hasOwnProperty(e.key)) keys[e.key] = false; });
 
-        await connMgr.connect('ws://localhost:8080');
-        gameLoop();
-        inputLoop();
+        // Conecta e inicia
+        try {
+            await connMgr.connect(CONFIG.serverUrl);
+            console.log('✅ Conectado ao servidor');
+            gameLoop();
+            inputLoop();
+        } catch (err) {
+            debugDiv.innerHTML = `❌ Falha na conexão: ${err.message}`;
+            console.error(err);
+        }
     </script>
 </body>
 </html>

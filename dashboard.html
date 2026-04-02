@@ -1,0 +1,256 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Aether-Titan Protocol - Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0a0c10; font-family: 'Segoe UI', 'Inter', system-ui, sans-serif; color: #e0e0e0; padding: 2rem; line-height: 1.5; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .header { text-align: center; margin-bottom: 2rem; border-bottom: 1px solid #2a2e3a; padding-bottom: 1rem; }
+        .header h1 { font-size: 2.5rem; background: linear-gradient(135deg, #7c9eff, #b47cff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+        .badge { display: inline-block; background: #1e2a3a; padding: 0.2rem 0.8rem; border-radius: 20px; font-size: 0.8rem; color: #7c9eff; font-family: monospace; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 1.8rem; margin-bottom: 2rem; }
+        .card { background: #111317; border-radius: 24px; padding: 1.5rem; border: 1px solid #22262f; box-shadow: 0 8px 20px rgba(0,0,0,0.3); }
+        .card h2 { font-size: 1.5rem; margin-bottom: 1.2rem; color: #d0d4e0; }
+        .input-group { margin-bottom: 1rem; }
+        label { display: block; font-size: 0.85rem; margin-bottom: 0.3rem; color: #b0b4c0; }
+        input, select { width: 100%; background: #1e2128; border: 1px solid #2f3540; padding: 0.7rem 1rem; border-radius: 14px; color: #fff; font-size: 0.9rem; outline: none; }
+        input:focus { border-color: #7c9eff; }
+        button { background: #2c3142; border: none; padding: 0.7rem 1.4rem; border-radius: 40px; font-weight: 600; color: #e0e4f0; cursor: pointer; transition: 0.2s; display: inline-flex; align-items: center; gap: 8px; }
+        button.primary { background: linear-gradient(135deg, #3c6eff, #7c4dff); color: white; box-shadow: 0 2px 6px rgba(60,110,255,0.3); }
+        button.primary:hover { transform: translateY(-2px); filter: brightness(1.05); }
+        .flex-buttons { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 1rem; }
+        .dev-panel { background: #0d0f14; border-radius: 20px; padding: 1.2rem; margin-top: 1rem; border-left: 4px solid #ffb74d; }
+        .dev-panel h3 { font-size: 1rem; color: #ffb74d; margin-bottom: 0.8rem; }
+        .slider-group { display: flex; gap: 1rem; flex-wrap: wrap; }
+        .slider-item { flex: 1; min-width: 120px; }
+        .value-display { font-family: monospace; font-size: 0.8rem; color: #a0e0ff; }
+        .readme-container { background: #0b0d11; border-radius: 20px; padding: 1rem; max-height: 500px; overflow-y: auto; border: 1px solid #232730; }
+        .readme-container pre { background: #0a0c10; padding: 1rem; border-radius: 14px; overflow-x: auto; font-size: 0.8rem; }
+        .footer { margin-top: 2rem; text-align: center; font-size: 0.75rem; color: #5a5f70; border-top: 1px solid #1e2128; padding-top: 1.5rem; }
+        @media (max-width: 780px) { body { padding: 1rem; } .grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>⚡ AETHER-TITAN PROTOCOL</h1>
+        <p>v9.1.0 · Netcode profissional · Prediction · Rollback · Delta compression</p>
+        <span class="badge">🔌 WebSocket + Binary Codec SCS-76</span>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <h2>🌐 Connection</h2>
+            <div class="input-group">
+                <label>🔗 WebSocket Server URL</label>
+                <input type="text" id="serverUrl" placeholder="ws://localhost:8080" value="ws://localhost:8080">
+            </div>
+            <div class="flex-buttons">
+                <button id="saveServerBtn" class="primary">💾 Salvar & Aplicar</button>
+                <button id="resetServerBtn">↺ Restaurar padrão</button>
+            </div>
+            <div class="dev-panel">
+                <h3>🛠️ Dev Options (simulação de rede)</h3>
+                <div class="slider-group">
+                    <div class="slider-item">
+                        <label>📡 Latência (ms)</label>
+                        <input type="range" id="latencySlider" min="0" max="300" value="0" step="5">
+                        <span id="latencyValue" class="value-display">0 ms</span>
+                    </div>
+                    <div class="slider-item">
+                        <label>⚠️ Jitter (±ms)</label>
+                        <input type="range" id="jitterSlider" min="0" max="100" value="0" step="2">
+                        <span id="jitterValue" class="value-display">0 ms</span>
+                    </div>
+                    <div class="slider-item">
+                        <label>📉 Packet loss (%)</label>
+                        <input type="range" id="lossSlider" min="0" max="20" value="0" step="1">
+                        <span id="lossValue" class="value-display">0 %</span>
+                    </div>
+                </div>
+                <div style="margin-top: 12px;">
+                    <canvas id="latencySpark" width="300" height="40" style="width:100%; max-width:300px; background:#0a0c10; border-radius:8px;"></canvas>
+                </div>
+                <div class="flex-buttons" style="margin-top: 12px;">
+                    <button id="applyDevSettings">✅ Aplicar à Demo</button>
+                    <button id="resetDevSettings">♻️ Zerar simulação</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>🎮 Launch & Tools</h2>
+            <p>Inicie a demonstração jogável com as configurações atuais.</p>
+            <div class="flex-buttons" style="margin-top: 16px;">
+                <button id="launchDemoBtn" class="primary">▶️ Abrir Demo Interativa</button>
+                <button id="openReadmeBtn">📄 Ver README.md</button>
+            </div>
+            <hr style="margin: 1.2rem 0; border-color:#262b36;">
+            <p><strong>📦 Estado atual:</strong><br>
+            Servidor: <span id="currentServerDisplay">ws://localhost:8080</span><br>
+            Simulação: <span id="currentSimDisplay">Latência 0ms, Jitter 0ms, Loss 0%</span>
+            </p>
+            <button id="clearStorageBtn" style="background:#2a1e2a;">🧹 Limpar configurações salvas</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>📘 Documentação / README</h2>
+        <div id="readmeContent" class="readme-container">⏳ Carregando README.md...</div>
+    </div>
+    <div class="footer">Aether-Titan Protocol © 2025 3eaCru — Marcelo A. Ferreira Jr.</div>
+</div>
+
+<script>
+    const serverInput = document.getElementById('serverUrl');
+    const saveServerBtn = document.getElementById('saveServerBtn');
+    const resetServerBtn = document.getElementById('resetServerBtn');
+    const currentServerSpan = document.getElementById('currentServerDisplay');
+    const latencySlider = document.getElementById('latencySlider');
+    const jitterSlider = document.getElementById('jitterSlider');
+    const lossSlider = document.getElementById('lossSlider');
+    const latencyVal = document.getElementById('latencyValue');
+    const jitterVal = document.getElementById('jitterValue');
+    const lossVal = document.getElementById('lossValue');
+    const applyDevBtn = document.getElementById('applyDevSettings');
+    const resetDevBtn = document.getElementById('resetDevSettings');
+    const currentSimSpan = document.getElementById('currentSimDisplay');
+    const launchDemoBtn = document.getElementById('launchDemoBtn');
+    const openReadmeBtn = document.getElementById('openReadmeBtn');
+    const clearStorageBtn = document.getElementById('clearStorageBtn');
+    const readmeContainer = document.getElementById('readmeContent');
+
+    const STORAGE_KEYS = {
+        serverUrl: 'aether_server_url',
+        devLatency: 'aether_dev_latency',
+        devJitter: 'aether_dev_jitter',
+        devLoss: 'aether_dev_loss'
+    };
+
+    function loadSettings() {
+        const savedServer = localStorage.getItem(STORAGE_KEYS.serverUrl);
+        if (savedServer) serverInput.value = savedServer;
+        currentServerSpan.innerText = serverInput.value;
+        const latency = parseInt(localStorage.getItem(STORAGE_KEYS.devLatency)) || 0;
+        const jitter = parseInt(localStorage.getItem(STORAGE_KEYS.devJitter)) || 0;
+        const loss = parseInt(localStorage.getItem(STORAGE_KEYS.devLoss)) || 0;
+        latencySlider.value = latency;
+        jitterSlider.value = jitter;
+        lossSlider.value = loss;
+        updateSliderDisplays();
+        updateSimDisplay();
+    }
+
+    function updateSliderDisplays() {
+        latencyVal.innerText = latencySlider.value + ' ms';
+        jitterVal.innerText = jitterSlider.value + ' ms';
+        lossVal.innerText = lossSlider.value + ' %';
+        updateSpark();
+    }
+
+    function updateSimDisplay() {
+        currentSimSpan.innerText = `Latência ${latencySlider.value}ms, Jitter ${jitterSlider.value}ms, Perda ${lossSlider.value}%`;
+    }
+
+    function saveServer() {
+        const url = serverInput.value.trim();
+        if (url) localStorage.setItem(STORAGE_KEYS.serverUrl, url);
+        currentServerSpan.innerText = url;
+    }
+
+    function saveDevSettings() {
+        localStorage.setItem(STORAGE_KEYS.devLatency, latencySlider.value);
+        localStorage.setItem(STORAGE_KEYS.devJitter, jitterSlider.value);
+        localStorage.setItem(STORAGE_KEYS.devLoss, lossSlider.value);
+        updateSimDisplay();
+        alert('Configurações de simulação salvas.');
+    }
+
+    function resetDevSettings() {
+        latencySlider.value = 0;
+        jitterSlider.value = 0;
+        lossSlider.value = 0;
+        updateSliderDisplays();
+        saveDevSettings();
+    }
+
+    function resetServerDefault() {
+        serverInput.value = 'ws://localhost:8080';
+        saveServer();
+    }
+
+    function clearAllStorage() {
+        if (confirm('Remover todas as configurações salvas?')) {
+            localStorage.removeItem(STORAGE_KEYS.serverUrl);
+            localStorage.removeItem(STORAGE_KEYS.devLatency);
+            localStorage.removeItem(STORAGE_KEYS.devJitter);
+            localStorage.removeItem(STORAGE_KEYS.devLoss);
+            loadSettings();
+            alert('Configurações resetadas.');
+        }
+    }
+
+    function launchDemo() {
+        const serverUrl = serverInput.value.trim();
+        if (!serverUrl) { alert('Defina uma URL de servidor WebSocket primeiro.'); return; }
+        localStorage.setItem(STORAGE_KEYS.serverUrl, serverUrl);
+        const devOpts = { latency: parseInt(latencySlider.value), jitter: parseInt(jitterSlider.value), loss: parseInt(lossSlider.value) };
+        sessionStorage.setItem('aether_demo_config', JSON.stringify(devOpts));
+        const params = new URLSearchParams({ server: serverUrl, latency: devOpts.latency, jitter: devOpts.jitter, loss: devOpts.loss });
+        window.open(`./examples/client-demo.html?${params.toString()}`, '_blank');
+    }
+
+    async function loadReadme() {
+        readmeContainer.innerHTML = '📖 Carregando README.md ...';
+        try {
+            const res = await fetch('./README.md');
+            if (!res.ok) throw new Error();
+            const text = await res.text();
+            readmeContainer.innerHTML = `<pre>${escapeHtml(text)}</pre>`;
+        } catch {
+            readmeContainer.innerHTML = '<pre>README.md não encontrado. Consulte o repositório GitHub.</pre>';
+        }
+    }
+    function escapeHtml(str) { return str.replace(/[&<>]/g, function(m){ if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; return m;}); }
+
+    // Sparkline
+    const sparkCanvas = document.getElementById('latencySpark');
+    let latencyHistory = [];
+    function updateSpark() {
+        if (!sparkCanvas) return;
+        const ctxSpark = sparkCanvas.getContext('2d');
+        const val = parseInt(latencySlider.value);
+        latencyHistory.push(val);
+        if (latencyHistory.length > 30) latencyHistory.shift();
+        ctxSpark.clearRect(0, 0, sparkCanvas.width, sparkCanvas.height);
+        ctxSpark.strokeStyle = '#7c9eff';
+        ctxSpark.lineWidth = 1.5;
+        ctxSpark.beginPath();
+        for (let i = 0; i < latencyHistory.length; i++) {
+            const x = (i / (latencyHistory.length - 1)) * sparkCanvas.width;
+            const y = sparkCanvas.height - (latencyHistory[i] / 300) * sparkCanvas.height;
+            if (i === 0) ctxSpark.moveTo(x, y);
+            else ctxSpark.lineTo(x, y);
+        }
+        ctxSpark.stroke();
+    }
+
+    saveServerBtn.addEventListener('click', saveServer);
+    resetServerBtn.addEventListener('click', resetServerDefault);
+    applyDevBtn.addEventListener('click', saveDevSettings);
+    resetDevBtn.addEventListener('click', resetDevSettings);
+    launchDemoBtn.addEventListener('click', launchDemo);
+    clearStorageBtn.addEventListener('click', clearAllStorage);
+    openReadmeBtn.addEventListener('click', loadReadme);
+    latencySlider.addEventListener('input', () => { updateSliderDisplays(); updateSimDisplay(); });
+    jitterSlider.addEventListener('input', () => { updateSliderDisplays(); updateSimDisplay(); });
+    lossSlider.addEventListener('input', () => { updateSliderDisplays(); updateSimDisplay(); });
+
+    loadSettings();
+    loadReadme();
+</script>
+</body>
+</html>

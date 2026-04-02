@@ -1,17 +1,26 @@
-﻿cmake_minimum_required(VERSION 3.15)
-project(scs76_sdk LANGUAGES CXX)
+﻿cmake_minimum_required(VERSION 3.10)
+project(AetherTitanNative)
 
-add_library(scs76_sdk SHARED scs76_sdk.cpp scs76_compress.cpp)
-target_compile_features(scs76_sdk PUBLIC cxx_std_17)
-target_include_directories(scs76_sdk PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_compile_definitions(scs76_sdk PRIVATE SCS76_SDK_EXPORT)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-add_library(scs76_sdk_static STATIC scs76_sdk.cpp scs76_compress.cpp)
-target_compile_features(scs76_sdk_static PUBLIC cxx_std_17)
-target_include_directories(scs76_sdk_static PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+add_library(aether_titan SHARED scs76_compress.cpp)
 
-install(TARGETS scs76_sdk scs76_sdk_static
-        ARCHIVE DESTINATION lib
-        LIBRARY DESTINATION lib
-        RUNTIME DESTINATION bin)
-install(FILES scs76_sdk.h DESTINATION include)
+if(UNIX AND NOT APPLE)
+    target_link_libraries(aether_titan PRIVATE m)
+    set_target_properties(aether_titan PROPERTIES PREFIX "lib")
+endif()
+
+if(APPLE)
+    set_target_properties(aether_titan PROPERTIES PREFIX "lib")
+endif()
+
+if(WIN32)
+    target_compile_definitions(aether_titan PRIVATE SCS_API=__declspec(dllexport))
+endif()
+
+install(TARGETS aether_titan
+    LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin
+    ARCHIVE DESTINATION lib
+)
