@@ -46,3 +46,4 @@ aether-titan-v9.1.0.zip
 aether-titan-v9.1.0/
 npm-debug.log*
 *.lock
+dist/
